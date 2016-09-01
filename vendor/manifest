@@ -1,0 +1,72 @@
+{
+	"version": 0,
+	"dependencies": [
+		{
+			"importpath": "github.com/chromicant/water",
+			"repository": "https://github.com/chromicant/water",
+			"vcs": "git",
+			"revision": "17293be429f6882ae1e8836d16f32045815738e5",
+			"branch": "forwg",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/devi/blake2/blake2s",
+			"repository": "https://github.com/devi/blake2",
+			"vcs": "git",
+			"revision": "8470047b978ec419f8551faea5bd64d89bfed6cc",
+			"branch": "master",
+			"path": "/blake2s",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/devi/chap",
+			"repository": "https://github.com/devi/chap",
+			"vcs": "git",
+			"revision": "3d48f07b8862a3450870ec7793ecf5b02bff6790",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/flynn/noise",
+			"repository": "https://github.com/flynn/noise",
+			"vcs": "git",
+			"revision": "7e06e1568198ea7d4d6582f1dcb1cec47e4285b1",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/inercia/kernctl",
+			"repository": "https://github.com/inercia/kernctl",
+			"vcs": "git",
+			"revision": "0a10173a2851136ef53f1583d2678a1e601b7b3e",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/minio/blake2b-simd",
+			"repository": "https://github.com/minio/blake2b-simd",
+			"vcs": "git",
+			"revision": "3f5f724cb5b182a5c278d6d3d55b40e7f8c2efb4",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/crypto/curve25519",
+			"repository": "https://go.googlesource.com/crypto",
+			"vcs": "git",
+			"revision": "bc89c496413265e715159bdc8478ee9a92fdc265",
+			"branch": "master",
+			"path": "/curve25519",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/crypto/poly1305",
+			"repository": "https://go.googlesource.com/crypto",
+			"vcs": "git",
+			"revision": "bc89c496413265e715159bdc8478ee9a92fdc265",
+			"branch": "master",
+			"path": "/poly1305",
+			"notests": true
+		}
+	]
+}
