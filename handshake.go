@@ -9,9 +9,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/flynn/go-wireguard/internal/skip32"
+	"github.com/flynn/go-wireguard/internal/tai64n"
 	"github.com/flynn/noise"
-	"github.com/flynn/wireguard-go/internal/skip32"
-	"github.com/flynn/wireguard-go/internal/tai64n"
 )
 
 const (
