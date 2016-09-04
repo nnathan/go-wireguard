@@ -102,7 +102,8 @@ func (f *Interface) Run() error {
 	}()
 
 	go func() {
-		// TODO: handle inside interface i/o
+		// handle inside interface i/o
+		f.readInsidePackets()
 		wg.Done()
 	}()
 
