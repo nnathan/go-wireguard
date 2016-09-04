@@ -35,6 +35,7 @@ func checkMessageType(b []byte) messageType {
 	} else if b[0] == byte(messageHandshakeCookie) && len(b) == messageHandshakeCookieLen {
 		return messageHandshakeCookie
 	} else {
+		// invalid type or invalid length for data packet
 		return messageInvalid
 	}
 }

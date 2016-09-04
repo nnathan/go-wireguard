@@ -54,6 +54,7 @@ func NewInterface(c InterfaceConfig) (*Interface, error) {
 		return nil, err
 	}
 
+	// TODO: configure initial set of peers
 	return f, nil
 }
 
@@ -86,12 +87,33 @@ func (f *Interface) Run() error {
 		return errors.New("wireguard: the interface is already started")
 	}
 
+	// What do we do here?
+	// 1. Watch for incoming packets from listening UDP connection
+	// 2. Watch for incoming packets from inside interface (io.ReadWriter)
+
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+
+	go func() {
+		// udp socket read loop
+		f.acceptOutsidePackets()
+		wg.Done()
+	}()
+
+	go func() {
+		// TODO: handle inside interface i/o
+		wg.Done()
+	}()
+
+	wg.Wait()
+
 	return nil
 }
 
 // Close shuts down the interface.
 func (f *Interface) Close() error {
-	return nil
+	return f.outside.Close()
 }
 
 // SetPrivateKey changes the private key for the interface. It is safe to call

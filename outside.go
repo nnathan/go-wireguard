@@ -2,6 +2,7 @@ package wireguard
 
 import (
 	"fmt"
+	"log"
 	"net"
 )
 
@@ -19,10 +20,14 @@ type packet struct {
 func (f *Interface) acceptOutsidePackets() {
 	for {
 		buf := make([]byte, mtu)
+		log.Println("wip: f.outside.ReadFromUDP()")
 		n, addr, err := f.outside.ReadFromUDP(buf)
+		log.Printf("wip: f.outside.ReadFromUDP() finished: (%d, %+v, %s)", n, addr, err)
 		if err != nil {
 			// TODO: figure out what kind of errors can be returned
 		}
+
+		// TODO: fire off a goroutine here
 		buf = buf[:n]
 		f.receiveOutsidePacket(packet{addr, buf})
 	}
@@ -35,7 +40,13 @@ func (f *Interface) receiveOutsidePacket(p packet) {
 	case messageData:
 		// queue for data processing
 	default:
-		// log invalid packet
+		if len(p.data) == 0 {
+			log.Printf("wip: invalid packet: 0 byte packet")
+		} else if len(p.data) > 0 && p.data[0] != byte(messageData) {
+			log.Printf("wip: invalid packet: invalid type=%d", p.data[0])
+		} else {
+			log.Printf("wip: invalid packet: data packet of size %d is too small (must be >=%d)", len(p.data), messageDataMinLen)
+		}
 	}
 }
 
