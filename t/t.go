@@ -17,7 +17,7 @@ func main() {
 	}
 
 	fmt.Printf("%v, %v\n\n", err, tun)
-	uc, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(0, 0, 0, 0), Port: 0})
+	uc, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(0, 0, 0, 0), Port: 55555})
 	if err != nil {
 		log.Fatal(err)
 	}
