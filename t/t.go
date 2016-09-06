@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/chromicant/water"
 	"github.com/flynn/go-wireguard"
+	"github.com/nnathan/water"
 	"log"
 	"net"
 	"os"

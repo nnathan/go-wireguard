@@ -2,14 +2,6 @@
 	"version": 0,
 	"dependencies": [
 		{
-			"importpath": "github.com/chromicant/water",
-			"repository": "https://github.com/chromicant/water",
-			"vcs": "git",
-			"revision": "17293be429f6882ae1e8836d16f32045815738e5",
-			"branch": "forwg",
-			"notests": true
-		},
-		{
 			"importpath": "github.com/devi/blake2/blake2s",
 			"repository": "https://github.com/devi/blake2",
 			"vcs": "git",
@@ -48,6 +40,14 @@
 			"vcs": "git",
 			"revision": "3f5f724cb5b182a5c278d6d3d55b40e7f8c2efb4",
 			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/nnathan/water",
+			"repository": "https://github.com/nnathan/water",
+			"vcs": "git",
+			"revision": "11538358821ef59813f556df865e7d37854a60e9",
+			"branch": "forwg",
 			"notests": true
 		},
 		{
