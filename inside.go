@@ -2,6 +2,7 @@ package wireguard
 
 import "log"
 import "fmt"
+import "net"
 import "runtime"
 
 // TODO: be smarter about this
@@ -39,5 +40,8 @@ func (f *Interface) readInsidePackets() {
 }
 
 func (f *Interface) receiveInsidePacket(buf []byte) {
-	fmt.Printf("%d %x\n", len(buf), buf)
+	srcIP := net.IPv4(buf[12], buf[13], buf[14], buf[15])
+	dstIP := net.IPv4(buf[16], buf[17], buf[18], buf[19])
+
+	fmt.Printf("src=%s dst=%s\n", srcIP, dstIP)
 }

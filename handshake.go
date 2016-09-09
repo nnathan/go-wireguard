@@ -15,11 +15,11 @@ import (
 )
 
 const (
-	handshakeStateConsumedInitiation = iota
+	handshakeStateZeroed = iota
+	handshakeStateConsumedInitiation
 	handshakeStateCreatedResponse
 	handshakeStateCreatedInitiation
 	handshakeStateConsumedResponse
-	handshakeStateZeroed
 )
 
 func init() {
@@ -86,9 +86,25 @@ type noiseKeypair struct {
 	peer *peer
 }
 
+func (nk *noiseKeypair) clear() {
+	nk.peer.iface.keypairsMtx.Lock()
+	delete(nk.peer.iface.keypairs, nk.senderIndex)
+	nk.peer.iface.keypairsMtx.Unlock()
+	*nk = noiseKeypair{}
+}
+
 type noiseKeypairs struct {
 	previous, current, next *noiseKeypair
 	sync.RWMutex
+}
+
+func (nk *noiseKeypairs) clear() {
+	nk.Lock()
+	defer nk.Unlock()
+	nk.previous.clear()
+	nk.current.clear()
+	nk.next.clear()
+	nk.previous, nk.current, nk.next = nil, nil, nil
 }
 
 var (
@@ -193,7 +209,7 @@ func (f *Interface) handshakeConsumeInitiation(data []byte) (*peer, error) {
 	peer.handshake.remoteIndex = binary.LittleEndian.Uint32(data[1:])
 	peer.handshake.lastInitiationConsumption = time.Now()
 	peer.handshake.state = handshakeStateConsumedInitiation
-	peer.handshake.Lock()
+	peer.handshake.Unlock()
 
 	return peer, nil
 }

@@ -4,10 +4,17 @@ import (
 	"errors"
 	"io"
 	"sync"
+	"sync/atomic"
 
 	"github.com/flynn/noise"
 	"golang.org/x/crypto/curve25519"
 )
+
+var (
+	errPeerDoesntExist = errors.New("wireguard: peer doesnt exist")
+)
+
+const maxQueuePackets int = 1024
 
 // An InterfaceConfig is the configuration used to create an interface.
 type InterfaceConfig struct {
@@ -54,7 +61,10 @@ func NewInterface(c InterfaceConfig) (*Interface, error) {
 		return nil, err
 	}
 
-	// TODO: configure initial set of peers
+	if err := f.SetPeers(c.Peers); err != nil {
+		return nil, err
+	}
+
 	return f, nil
 }
 
@@ -73,6 +83,7 @@ type Interface struct {
 
 	peersMtx sync.RWMutex
 	peers    map[publicKey]*peer
+	peerList []*peer
 
 	handshakesMtx sync.RWMutex
 	handshakes    map[uint32]*noiseHandshake
@@ -171,12 +182,51 @@ func (f *Interface) SetPeers(peers []*Peer) error {
 
 // GetPeers retrieves a list of all peers known to the interface.
 func (f *Interface) GetPeers() []*Peer {
-	return nil
+	peers := make([]*Peer, len(f.peerList))
+
+	for i, v := range f.peerList {
+		peers[i] = v.public()
+	}
+
+	return peers
 }
 
 // RemovePeer removes the peer identified with the public key pubkey from the
 // interface configuration.
 func (f *Interface) RemovePeer(pubkey []byte) error {
+	pk := publicKey{}
+	copy(pk[:], pubkey)
+	p := f.peers[pk]
+
+	if p == nil {
+		return errPeerDoesntExist
+	}
+
+	f.peersMtx.Lock()
+	for i := range f.peerList {
+		if p.internalID == f.peerList[i].internalID {
+			copy(f.peerList[i:], f.peerList[i+1:])
+			break
+		}
+	}
+	f.peersMtx.Unlock()
+
+	// it may make sense to convert below into a method
+	p.handshake.clear()
+	p.keypairs.clear()
+
+	f.peersMtx.Lock()
+	delete(f.peers, pk)
+	f.peersMtx.Unlock()
+
+	p.retransmitHandshake.Stop()
+	p.sendKeepalive.Stop()
+	p.newHandshake.Stop()
+	p.killEphemerals.Stop()
+	p.persistentKeepalive.Stop()
+	close(p.txQueue)
+	p.txQueue = nil
+
 	return nil
 }
 
@@ -184,5 +234,24 @@ func (f *Interface) RemovePeer(pubkey []byte) error {
 // by its public key, already exists, then all configuration will be replaced
 // with the new fields.
 func (f *Interface) AddPeer(p *Peer) error {
+	pk := publicKey{}
+	copy(pk[:], p.PublicKey)
+
+	np := f.peers[pk]
+
+	if np == nil {
+		np = &peer{internalID: atomic.AddUint64(&peerCounter, 1)}
+		f.peersMtx.Lock()
+		f.peers[pk] = np
+		f.peerList = append(f.peerList, np)
+		f.peersMtx.Unlock()
+	}
+
+	np.endpointAddr = p.Endpoint
+	np.handshake = noiseHandshake{remoteStatic: [32]byte(pk), peer: np}
+	np.txQueue = make(chan []byte, maxQueuePackets)
+	np.iface = f
+	np.persistentKeepaliveInterval = p.PersistentKeepaliveInterval
+
 	return nil
 }
