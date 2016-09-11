@@ -118,6 +118,41 @@ func (n *Net) MatchIP(ip net.IP) (route *net.IPNet, value interface{}, err error
 	return
 }
 
+func (n *Net) GetByValue(value interface{}) (routes []*net.IPNet) {
+	if n.trie.size == 0 {
+		return routes
+	}
+
+	h := func(k []byte, v interface{}) bool {
+		if v == value {
+			routes = append(routes, netKeyToIPNet(k))
+		}
+
+		return true
+	}
+
+	// walk the trie
+	_ = allprefixed(&n.trie.root, h)
+
+	return routes
+}
+
+func (n *Net) GetAll() (routes []*net.IPNet) {
+	if n.trie.size == 0 {
+		return routes
+	}
+
+	h := func(k []byte, v interface{}) bool {
+		routes = append(routes, netKeyToIPNet(k))
+		return true
+	}
+
+	// walk the trie
+	_ = allprefixed(&n.trie.root, h)
+
+	return routes
+}
+
 func (n *Net) match(key []byte) ([]byte, interface{}) {
 	if n.trie.size > 0 {
 		if node := lookup(&n.trie.root, key, false); node != nil {

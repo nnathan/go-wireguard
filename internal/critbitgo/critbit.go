@@ -9,7 +9,6 @@ import (
 	"strconv"
 )
 
-// The matrix of most significant bit
 var msbMatrix [256]byte
 
 func buildMsbMatrix() {

@@ -5,7 +5,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/k-sone/critbitgo"
+	"github.com/flynn/go-wireguard/internal/critbitgo"
 )
 
 var routeCount int = 10000

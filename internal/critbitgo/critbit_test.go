@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/k-sone/critbitgo"
+	"github.com/flynn/go-wireguard/internal/critbitgo"
 )
 
 func buildTrie(t *testing.T, keys []string) *critbitgo.Trie {

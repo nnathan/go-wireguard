@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k-sone/critbitgo"
+	"github.com/flynn/go-wireguard/internal/critbitgo"
 )
 
 func buildSortedMap(keys []string) *critbitgo.SortedMap {

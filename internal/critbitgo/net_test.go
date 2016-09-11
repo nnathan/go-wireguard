@@ -4,7 +4,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/k-sone/critbitgo"
+	"github.com/flynn/go-wireguard/internal/critbitgo"
 )
 
 func TestNet(t *testing.T) {
@@ -107,4 +107,79 @@ func TestNetMatch(t *testing.T) {
 	checkMatch(t, trie, "192.168.1.64/32", "192.168.1.0/24")
 	checkMatch(t, trie, "192.168.2.2/32", "192.168.2.2/32")
 	checkMatch(t, trie, "192.168.2.3/32", "192.168.0.0/16")
+}
+
+func TestNetGetByValue(t *testing.T) {
+	trie := critbitgo.NewNet()
+
+	type kv struct {
+		k, v string
+	}
+
+	entriesByValue := map[string][]string{
+		"0": []string{"0.0.0.0/4", "192.168.0.0/16"},
+		"1": []string{"192.168.1.0/24", "192.168.1.0/28"},
+		"2": []string{"192.168.1.0/32", "192.168.1.1/32"},
+		"3": []string{"192.168.1.2/32", "192.168.1.32/27"},
+		"4": []string{"192.168.1.32/30", "192.168.2.1/32"},
+		"5": []string{"192.168.2.2/32"},
+	}
+
+	for k, v := range entriesByValue {
+		for _, cidr := range v {
+			if err := trie.AddCIDR(cidr, k); err != nil {
+				t.Errorf("AddCIDR() - %s: error occurred %s", cidr, err)
+			}
+		}
+	}
+
+	// check string e is contained in slice s
+	contains := func(s []string, e string) bool {
+		for _, a := range s {
+			if a == e {
+				return true
+			}
+		}
+		return false
+	}
+
+	for k, v := range entriesByValue {
+		nets := trie.GetByValue(k)
+		for _, n := range nets {
+			if !contains(v, n.String()) {
+				t.Errorf("%s is not contained in %s:%s", n.String(), k, v)
+			}
+		}
+	}
+}
+
+func TestNetGetAll(t *testing.T) {
+	trie := critbitgo.NewNet()
+
+	cidrs := []string{
+		"0.0.0.0/4",
+		"192.168.0.0/16",
+		"192.168.1.0/24",
+		"192.168.1.0/28",
+		"192.168.1.0/32",
+		"192.168.1.1/32",
+		"192.168.1.2/32",
+		"192.168.1.32/27",
+		"192.168.1.32/30",
+		"192.168.2.1/32",
+		"192.168.2.2/32",
+	}
+
+	for _, cidr := range cidrs {
+		if err := trie.AddCIDR(cidr, &cidr); err != nil {
+			t.Errorf("AddCIDR() - %s: error occurred %s", cidr, err)
+		}
+	}
+
+	// this should iterate in the sorted order as specified by cidrs
+	for i, n := range trie.GetAll() {
+		if cidrs[i] != n.String() {
+			t.Errorf("%s != %s", cidrs[i], n.String())
+		}
+	}
 }
