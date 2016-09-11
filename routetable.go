@@ -1,10 +1,15 @@
 package wireguard
 
 import (
+	"errors"
 	"net"
 	"sync"
 
 	"github.com/flynn/go-wireguard/internal/critbitgo"
+)
+
+var (
+	errInvalidIpPacket = errors.New("wireguard: invalid ip packet")
 )
 
 type RouteTable struct {
@@ -45,6 +50,22 @@ func (rt RouteTable) Lookup(ip net.IP) (p *peer, err error) {
 		p = pInf.(*peer)
 	}
 	return p, err
+}
+
+func (rt RouteTable) LookupFromPacket(packet []byte) (p *peer, err error) {
+	ipVer := packet[0] >> 4
+
+	var dst net.IP
+
+	if ipVer == 4 {
+		dst = net.IP(packet[16:20])
+	} else if ipVer == 6 {
+		dst = net.IP(packet[24:40])
+	} else {
+		return nil, errInvalidIpPacket
+	}
+
+	return rt.Lookup(dst)
 }
 
 // RemoveByPeer deletes all entries associated with the given peer.

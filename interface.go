@@ -2,7 +2,9 @@ package wireguard
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"net"
 	"sync"
 	"sync/atomic"
 
@@ -61,6 +63,10 @@ func NewInterface(c InterfaceConfig) (*Interface, error) {
 		return nil, err
 	}
 
+	f.handshakes = make(map[uint32]*noiseHandshake)
+
+	f.routetable = NewRouteTable()
+
 	if err := f.SetPeers(c.Peers); err != nil {
 		return nil, err
 	}
@@ -90,6 +96,8 @@ type Interface struct {
 
 	keypairsMtx sync.RWMutex
 	keypairs    map[uint32]*noiseKeypair
+
+	routetable RouteTable
 }
 
 // Run starts the interface and blocks until it is closed.
@@ -177,6 +185,18 @@ func (f *Interface) SetPresharedKey(k []byte) error {
 // SetPeers replaces all of the peers that the interface is configured for with
 // a new list.
 func (f *Interface) SetPeers(peers []*Peer) error {
+	f.routetable.Clear()
+	f.peersMtx.Lock()
+	f.peerList = []*peer{}
+	f.peers = make(map[publicKey]*peer)
+	f.peersMtx.Unlock()
+
+	for _, p := range peers {
+		if err := f.AddPeer(p); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -211,9 +231,10 @@ func (f *Interface) RemovePeer(pubkey []byte) error {
 	}
 	f.peersMtx.Unlock()
 
-	// it may make sense to convert below into a method
 	p.handshake.clear()
 	p.keypairs.clear()
+
+	err := f.routetable.RemoveByPeer(p)
 
 	f.peersMtx.Lock()
 	delete(f.peers, pk)
@@ -227,7 +248,7 @@ func (f *Interface) RemovePeer(pubkey []byte) error {
 	close(p.txQueue)
 	p.txQueue = nil
 
-	return nil
+	return err
 }
 
 // AddPeer adds a peer to the interface configuration. If the peer, identified
@@ -239,19 +260,48 @@ func (f *Interface) AddPeer(p *Peer) error {
 
 	np := f.peers[pk]
 
-	if np == nil {
-		np = &peer{internalID: atomic.AddUint64(&peerCounter, 1)}
-		f.peersMtx.Lock()
-		f.peers[pk] = np
-		f.peerList = append(f.peerList, np)
-		f.peersMtx.Unlock()
+	// peer exists
+	if np != nil {
+		_ = f.routetable.RemoveByPeer(np)
+		goto ReplaceExistingPeer
 	}
 
-	np.endpointAddr = p.Endpoint
-	np.handshake = noiseHandshake{remoteStatic: [32]byte(pk), peer: np}
+	// new peer
+	np = &peer{internalID: atomic.AddUint64(&peerCounter, 1)}
+	f.peersMtx.Lock()
+	f.peers[pk] = np
+	f.peerList = append(f.peerList, np)
+	f.peersMtx.Unlock()
 	np.txQueue = make(chan []byte, maxQueuePackets)
+	np.handshake = noiseHandshake{remoteStatic: [32]byte(pk), peer: np}
 	np.iface = f
+	np.initTimers()
+
+ReplaceExistingPeer:
+
 	np.persistentKeepaliveInterval = p.PersistentKeepaliveInterval
+
+	np.endpointAddrMtx.Lock()
+	np.endpointAddr = p.Endpoint
+	fmt.Println("adding peer: ", np.endpointAddr)
+	if np.endpointAddr != nil {
+		fmt.Println("endpoint addr: creating conn")
+		conn, err := net.DialUDP("udp", nil, np.endpointAddr)
+		if err != nil {
+			np.endpointAddrMtx.Unlock()
+			return err
+		}
+		np.conn = conn
+		fmt.Println("assigned conn")
+	}
+	np.endpointAddrMtx.Unlock()
+
+	for _, r := range p.AllowedIPs {
+		if err := f.routetable.Insert(r, np); err != nil {
+			defer f.routetable.RemoveByPeer(np)
+			return err
+		}
+	}
 
 	return nil
 }

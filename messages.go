@@ -9,7 +9,7 @@ const (
 	messageHandshakeCookie     messageType = 3
 	messageData                messageType = 4
 
-	messageHandshakeInitiationLen = 1 /*type*/ + 4 /*sender*/ + 32 /*ephemeral*/ + 32 /*static*/ + 12 /*timestamp*/ + 16 /*mac1*/ + 16 /*mac2*/
+	messageHandshakeInitiationLen = 1 /*type*/ + 4 /*sender*/ + 32 /*ephemeral*/ + 32 + 16 /*static+auth*/ + 12 + 16 /*timestamp+auth*/ + 16 /*mac1*/ + 16 /*mac2*/
 
 	messageHandshakeResponseLen = 1 /*type*/ + 4 /*sender*/ + 4 /*receiver*/ + 32 /*ephemeral*/ + 16 /*mac1*/ + 16 /*mac2*/
 

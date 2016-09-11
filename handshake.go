@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -146,9 +147,12 @@ func (f *Interface) handshakeCreateInitiation(handshake *noiseHandshake) []byte 
 	var taiBuf [12]byte
 	tai64n.Now().WriteStorage(taiBuf[:])
 
-	handshake.hs.WriteMessage(res, taiBuf[:])
 	handshake.senderIndex = getHandshakeID()
-	binary.LittleEndian.PutUint32(res[1:], handshake.senderIndex)
+	binary.LittleEndian.PutUint32(res[1:5], handshake.senderIndex)
+
+	fmt.Println("before writemessage: ", len(res))
+	res, _, _ = handshake.hs.WriteMessage(res, taiBuf[:])
+	fmt.Println("after writemessage: ", len(res))
 
 	handshake.state = handshakeStateCreatedInitiation
 

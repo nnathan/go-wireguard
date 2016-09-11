@@ -1,7 +1,6 @@
 package wireguard
 
 import "log"
-import "fmt"
 import "net"
 import "runtime"
 
@@ -39,9 +38,40 @@ func (f *Interface) readInsidePackets() {
 	}
 }
 
-func (f *Interface) receiveInsidePacket(buf []byte) {
-	srcIP := net.IPv4(buf[12], buf[13], buf[14], buf[15])
-	dstIP := net.IPv4(buf[16], buf[17], buf[18], buf[19])
+// extracts destination address from IPv4/IPv6 packet
+func extractIP(buf []byte) (src net.IP, dst net.IP, err error) {
+	ipVer := buf[0] >> 4
 
-	fmt.Printf("src=%s dst=%s\n", srcIP, dstIP)
+	if ipVer == 4 {
+		src = net.IP(buf[12:16])
+		dst = net.IP(buf[16:20])
+	} else if ipVer == 6 {
+		src = net.IP(buf[8:24])
+		dst = net.IP(buf[24:40])
+	} else {
+		return src, dst, errInvalidIpPacket
+	}
+
+	return src, dst, nil
+}
+
+func (f *Interface) receiveInsidePacket(buf []byte) error {
+	_, dst, err := extractIP(buf)
+	if err != nil {
+		return err
+	}
+
+	p, err := f.routetable.Lookup(dst)
+	if err != nil {
+		return err
+	}
+
+	if p == nil {
+		// we need to generate ICMP unreachable message
+		// but very tricky because we need to know our interface
+		// IP address, and the whole part of construcing the ICMP
+		// itself
+	}
+
+	return p.send(buf)
 }

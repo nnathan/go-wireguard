@@ -2,6 +2,7 @@ package wireguard
 
 import (
 	"encoding/binary"
+	"fmt"
 	"hash"
 	"sync"
 	"time"
@@ -28,6 +29,7 @@ type cookie struct {
 }
 
 func (f *Interface) cookieAddMACs(msg []byte, peer *peer) []byte {
+	var out [32]byte
 	if cap(msg) < len(msg)+(cookieLen*2) {
 		panic("msg is not long enough")
 	}
@@ -43,7 +45,9 @@ func (f *Interface) cookieAddMACs(msg []byte, peer *peer) []byte {
 	}
 	h.Write(peer.handshake.remoteStatic[:])
 	h.Write(msg)
-	msg = h.Sum(msg)
+	h.Sum(out[:])
+	msg = msg[:len(msg)+cookieLen]
+	copy(msg[len(msg)-cookieLen:], out[:16])
 
 	peer.latestCookie.Lock()
 	copy(peer.latestCookie.lastMAC1[:], msg[len(msg)-cookieLen:])
@@ -56,7 +60,9 @@ func (f *Interface) cookieAddMACs(msg []byte, peer *peer) []byte {
 	if peer.latestCookie.valid && time.Now().Before(peer.latestCookie.birthdate.Add(cookieSecretMaxAge-cookieSecretLatency)) {
 		h := blake2s.NewKeyed(peer.latestCookie.cookie[:])
 		h.Write(msg)
-		msg = h.Sum(msg)
+		h.Sum(out[:])
+		msg = msg[:len(msg)+cookieLen]
+		copy(msg[len(msg)-cookieLen:], out[:16])
 	} else {
 		// mac2 is all zeros if there is no valid cookie
 		msg = msg[:len(msg)+cookieLen]
