@@ -1,6 +1,7 @@
 package wireguard
 
 import (
+	"log"
 	"net"
 	"sync"
 	"time"
@@ -140,6 +141,7 @@ queueLoop:
 		if p.handshake.state == handshakeStateZeroed {
 			hs = p.iface.handshakeCreateInitiation(&p.handshake)
 			hs = p.iface.cookieAddMACs(hs, p)
+			log.Printf("hs: %x\n", hs)
 			n, err := p.conn.Write(hs)
 			p.txStats(n)
 			if err != nil {

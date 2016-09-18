@@ -2,12 +2,13 @@ package wireguard
 
 import (
 	"encoding/binary"
-	"fmt"
 	"hash"
+	"log"
 	"sync"
 	"time"
 
-	"github.com/devi/blake2/blake2s"
+	"github.com/flynn/go-wireguard/internal/blake2s"
+
 	"github.com/devi/chap"
 )
 
@@ -29,7 +30,6 @@ type cookie struct {
 }
 
 func (f *Interface) cookieAddMACs(msg []byte, peer *peer) []byte {
-	var out [32]byte
 	if cap(msg) < len(msg)+(cookieLen*2) {
 		panic("msg is not long enough")
 	}
@@ -39,15 +39,16 @@ func (f *Interface) cookieAddMACs(msg []byte, peer *peer) []byte {
 	// mac1
 	var h hash.Hash
 	if len(f.presharedKey) > 0 {
-		h = blake2s.NewKeyed(f.presharedKey)
+		h = blake2s.NewMAC(16, f.presharedKey)
 	} else {
-		h = blake2s.New()
+		h = blake2s.NewMAC(16, []byte{})
 	}
 	h.Write(peer.handshake.remoteStatic[:])
+	log.Printf("len(peer.handshake.remoteStatic=%d)", len(peer.handshake.remoteStatic))
 	h.Write(msg)
-	h.Sum(out[:])
-	msg = msg[:len(msg)+cookieLen]
-	copy(msg[len(msg)-cookieLen:], out[:16])
+	log.Printf("before mac1: len(msg)=%d\n", len(msg))
+	msg = h.Sum(msg)
+	log.Printf("after mac1: len(msg)=%d\n", len(msg))
 
 	peer.latestCookie.Lock()
 	copy(peer.latestCookie.lastMAC1[:], msg[len(msg)-cookieLen:])
@@ -58,15 +59,17 @@ func (f *Interface) cookieAddMACs(msg []byte, peer *peer) []byte {
 	peer.latestCookie.RLock()
 	defer peer.latestCookie.RUnlock()
 	if peer.latestCookie.valid && time.Now().Before(peer.latestCookie.birthdate.Add(cookieSecretMaxAge-cookieSecretLatency)) {
-		h := blake2s.NewKeyed(peer.latestCookie.cookie[:])
+		h := blake2s.NewMAC(16, peer.latestCookie.cookie[:])
 		h.Write(msg)
-		h.Sum(out[:])
-		msg = msg[:len(msg)+cookieLen]
-		copy(msg[len(msg)-cookieLen:], out[:16])
+		log.Printf("before mac2: len(msg)=%d\n", len(msg))
+		h.Sum(msg)
+		log.Printf("after mac2: len(msg)=%d\n", len(msg))
 	} else {
 		// mac2 is all zeros if there is no valid cookie
+		log.Printf("before mac2: len(msg)=%d\n", len(msg))
 		msg = msg[:len(msg)+cookieLen]
 		return msg
+		log.Printf("after mac2: len(msg)=%d\n", len(msg))
 	}
 
 	return msg
@@ -108,9 +111,9 @@ func (f *Interface) cookieMessageConsume(msg []byte) {
 		return
 	}
 	if len(f.presharedKey) > 0 {
-		h = blake2s.NewKeyed(f.presharedKey)
+		h = blake2s.NewMAC(16, f.presharedKey)
 	} else {
-		h = blake2s.New()
+		h = blake2s.NewMAC(16, []byte{})
 	}
 	f.identityMtx.RUnlock()
 
