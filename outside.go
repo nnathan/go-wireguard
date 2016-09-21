@@ -37,9 +37,10 @@ func (f *Interface) receiveOutsidePacket(p packet) {
 	log.Printf("received packet: %x\n", p.data)
 	switch checkMessageType(p.data) {
 	case messageHandshakeInitiation:
-	// queue handshake
+		// queue handshake
 	case messageHandshakeResponse:
 		log.Println("received messageHandshakeResponse")
+		f.receiveHandshakePacket(messageHandshakeResponse, p)
 	case messageHandshakeCookie:
 	case messageData:
 		// queue for data processing
