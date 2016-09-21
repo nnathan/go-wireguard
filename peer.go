@@ -1,6 +1,8 @@
 package wireguard
 
 import (
+	"fmt"
+	"log"
 	"net"
 	"sync"
 	"time"
@@ -140,7 +142,9 @@ queueLoop:
 		if p.handshake.state == handshakeStateZeroed {
 			hs = p.iface.handshakeCreateInitiation(&p.handshake)
 			hs = p.iface.cookieAddMACs(hs, p)
+			p.timerAnyAuthenticatedPacketTraversal()
 			n, err := p.conn.WriteToUDP(hs, p.endpointAddr)
+			p.timerHandshakeInitiated()
 			p.txStats(n)
 			if err != nil {
 				return err
@@ -151,6 +155,22 @@ queueLoop:
 }
 
 func (p *peer) initTimers() {
+	// since timers immediately begin after creation we use time.Hour
+	// to give ample time to stop them
+	p.retransmitHandshake = time.AfterFunc(time.Hour, p.expiredRetransmitHandshake)
+	p.retransmitHandshake.Stop()
+	p.sendKeepalive = time.AfterFunc(time.Hour, p.expiredSendKeepalive)
+	p.sendKeepalive.Stop()
+	p.newHandshake = time.AfterFunc(time.Hour, p.expiredNewHandshake)
+	p.newHandshake.Stop()
+	p.killEphemerals = time.AfterFunc(time.Hour, p.expiredKillEphemerals)
+	p.killEphemerals.Stop()
+	p.persistentKeepalive = time.AfterFunc(time.Hour, p.expiredPersistentKeepalive)
+	p.persistentKeepalive.Stop()
+
+}
+
+func (p *peer) timerHandshakeInitiated() {
 }
 
 func (p *peer) timerAnyAuthenticatedPacketReceived() {
@@ -158,7 +178,12 @@ func (p *peer) timerAnyAuthenticatedPacketReceived() {
 }
 
 func (p *peer) timerAnyAuthenticatedPacketTraversal() {
-
+	if p.persistentKeepaliveInterval > 0 {
+		if !p.persistentKeepalive.Stop() {
+			<-p.persistentKeepalive.C
+		}
+		p.persistentKeepalive.Reset(slackTime(p.persistentKeepaliveInterval))
+	}
 }
 
 func (p *peer) timerEphemeralKeyCreated() {
@@ -167,4 +192,28 @@ func (p *peer) timerEphemeralKeyCreated() {
 
 func (p *peer) timerHandshakeComplete() {
 
+}
+
+func (p *peer) expiredRetransmitHandshake() {}
+func (p *peer) expiredSendKeepalive()       {}
+func (p *peer) expiredNewHandshake()        {}
+func (p *peer) expiredKillEphemerals()      {}
+
+func (p *peer) expiredPersistentKeepalive() {
+	if p.persistentKeepaliveInterval == 0 {
+		return
+	}
+
+	// TODO: only print in debug mode
+	log.Printf("Sending keep alive packet to peer %s, since we haven't sent or received authenticated data for %d seconds", p, p.persistentKeepaliveInterval)
+
+	// TODO: construct and send keepalive packet
+}
+
+func (p *peer) String() string {
+	return fmt.Sprintf("%d (%s:%d)", p.internalID, p.endpointAddr.IP, p.endpointAddr.Port)
+}
+func slackTime(seconds int) time.Duration {
+	const quarterSecond = 250 * time.Millisecond
+	return time.Duration(seconds)*time.Second - quarterSecond
 }
