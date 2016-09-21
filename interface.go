@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"sync"
 	"sync/atomic"
 
@@ -285,14 +284,7 @@ ReplaceExistingPeer:
 	np.endpointAddr = p.Endpoint
 	fmt.Println("adding peer: ", np.endpointAddr)
 	if np.endpointAddr != nil {
-		fmt.Println("endpoint addr: creating conn")
-		conn, err := net.DialUDP("udp", nil, np.endpointAddr)
-		if err != nil {
-			np.endpointAddrMtx.Unlock()
-			return err
-		}
-		np.conn = conn
-		fmt.Println("assigned conn")
+		np.conn = f.outside
 	}
 	np.endpointAddrMtx.Unlock()
 

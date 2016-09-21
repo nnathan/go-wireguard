@@ -41,8 +41,9 @@ func (f *Interface) cookieAddMACs(msg []byte, peer *peer) []byte {
 	if len(f.presharedKey) > 0 {
 		h = blake2s.NewMAC(16, f.presharedKey)
 	} else {
-		h = blake2s.NewMAC(16, []byte{})
+		h = blake2s.NewMAC(16, nil)
 	}
+	log.Printf("remote static: %x", peer.handshake.remoteStatic[:])
 	h.Write(peer.handshake.remoteStatic[:])
 	log.Printf("len(peer.handshake.remoteStatic=%d)", len(peer.handshake.remoteStatic))
 	h.Write(msg)
@@ -113,7 +114,7 @@ func (f *Interface) cookieMessageConsume(msg []byte) {
 	if len(f.presharedKey) > 0 {
 		h = blake2s.NewMAC(16, f.presharedKey)
 	} else {
-		h = blake2s.NewMAC(16, []byte{})
+		h = blake2s.NewMAC(16, nil)
 	}
 	f.identityMtx.RUnlock()
 

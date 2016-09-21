@@ -1,7 +1,6 @@
 package wireguard
 
 import (
-	"log"
 	"net"
 	"sync"
 	"time"
@@ -48,7 +47,7 @@ type peer struct {
 
 	endpointAddr    *net.UDPAddr
 	endpointAddrMtx sync.RWMutex
-	conn            *net.UDPConn
+	conn            UDPConn
 
 	handshake         noiseHandshake
 	lastSentHandshake time.Time
@@ -118,14 +117,14 @@ func (p *peer) txStats(n int) {
 
 func (p *peer) send(packet []byte) error {
 
-	// we use a loop to enqueue the packets instead of the
-	// simple inner select because we may contend with other
-	// goroutines and lose the slot we created when removing
-	// an item from the buffer
+	// we drop old packets from txQueue to insert new packets,
+	// however we need to wrap this in a for loop since we
+	// contend with multiple goroutines
 queueLoop:
 	for {
 		select {
 		case p.txQueue <- packet:
+			// inserted in queue, we're good
 			break queueLoop
 		default:
 			// queue full, remove from tail
@@ -141,8 +140,7 @@ queueLoop:
 		if p.handshake.state == handshakeStateZeroed {
 			hs = p.iface.handshakeCreateInitiation(&p.handshake)
 			hs = p.iface.cookieAddMACs(hs, p)
-			log.Printf("hs: %x\n", hs)
-			n, err := p.conn.Write(hs)
+			n, err := p.conn.WriteToUDP(hs, p.endpointAddr)
 			p.txStats(n)
 			if err != nil {
 				return err
