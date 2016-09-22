@@ -7,8 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/flynn/go-wireguard/internal/blake2s"
-
+	"github.com/dchest/blake2s"
 	"github.com/devi/chap"
 )
 

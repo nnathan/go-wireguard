@@ -2,6 +2,14 @@
 	"version": 0,
 	"dependencies": [
 		{
+			"importpath": "github.com/dchest/blake2s",
+			"repository": "https://github.com/dchest/blake2s",
+			"vcs": "git",
+			"revision": "bddf4a4036dcf791d45e4402684a8382adcc8f78",
+			"branch": "master",
+			"notests": true
+		},
+		{
 			"importpath": "github.com/devi/blake2/blake2s",
 			"repository": "https://github.com/devi/blake2",
 			"vcs": "git",
