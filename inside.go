@@ -61,17 +61,17 @@ func (f *Interface) receiveInsidePacket(buf []byte) error {
 		return err
 	}
 
-	p, err := f.routetable.Lookup(dst)
+	peer, err := f.routetable.Lookup(dst)
 	if err != nil {
 		return err
 	}
 
-	if p == nil {
+	if peer == nil {
 		// we need to generate ICMP unreachable message
 		// but very tricky because we need to know our interface
 		// IP address, and the whole part of construcing the ICMP
 		// itself
 	}
 
-	return p.send(buf)
+	return peer.send(buf)
 }

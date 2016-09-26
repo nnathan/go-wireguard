@@ -117,40 +117,31 @@ func (p *peer) txStats(n int) {
 	p.txBytes += uint64(n)
 }
 
+// send implements packet_send_queue()
 func (p *peer) send(packet []byte) error {
-
-	// we drop old packets from txQueue to insert new packets,
-	// however we need to wrap this in a for loop since we
-	// contend with multiple goroutines
-queueLoop:
-	for {
-		select {
-		case p.txQueue <- packet:
-			// inserted in queue, we're good
-			break queueLoop
-		default:
-			// queue full, remove from tail
-			<-p.txQueue
-		}
-	}
-
 	p.keypairs.RLock()
-	var hs []byte
 	defer p.keypairs.RUnlock()
 	if p.keypairs.current == nil {
-		// no keypair exist, need to fire up a job to initiate noise handshake
-		if p.handshake.state == handshakeStateZeroed {
-			hs = p.iface.handshakeCreateInitiation(&p.handshake)
-			hs = p.iface.cookieAddMACs(hs, p)
-			p.timerAnyAuthenticatedPacketTraversal()
-			n, err := p.conn.WriteToUDP(hs, p.endpointAddr)
-			p.timerHandshakeInitiated()
-			p.txStats(n)
-			if err != nil {
-				return err
-			}
+		p.sendHandshakeInitiation()
+	}
+	return nil
+}
+
+func (p *peer) sendHandshakeInitiation() error {
+	var hs []byte
+	// no keypair exist, need to fire up a job to initiate noise handshake
+	if p.handshake.state == handshakeStateZeroed {
+		hs = p.iface.handshakeCreateInitiation(&p.handshake)
+		hs = p.iface.cookieAddMACs(hs, p)
+		p.timerAnyAuthenticatedPacketTraversal()
+		n, err := p.conn.WriteToUDP(hs, p.endpointAddr)
+		p.timerHandshakeInitiated()
+		p.txStats(n)
+		if err != nil {
+			return err
 		}
 	}
+
 	return nil
 }
 
