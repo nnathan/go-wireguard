@@ -60,7 +60,7 @@ type peer struct {
 
 	rxBytes, txBytes uint64
 
-	txQueue chan []byte
+	txQueue *PacketQueue
 
 	persistentKeepaliveInterval int
 	needAnotherKeepalive        bool

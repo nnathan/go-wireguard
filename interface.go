@@ -244,7 +244,6 @@ func (f *Interface) RemovePeer(pubkey []byte) error {
 	p.newHandshake.Stop()
 	p.killEphemerals.Stop()
 	p.persistentKeepalive.Stop()
-	close(p.txQueue)
 	p.txQueue = nil
 
 	return err
@@ -271,7 +270,7 @@ func (f *Interface) AddPeer(p *Peer) error {
 	f.peers[pk] = np
 	f.peerList = append(f.peerList, np)
 	f.peersMtx.Unlock()
-	np.txQueue = make(chan []byte, maxQueuePackets)
+	np.txQueue = &PacketQueue{}
 	np.handshake = noiseHandshake{remoteStatic: [32]byte(pk), peer: np}
 	np.iface = f
 	np.initTimers()
