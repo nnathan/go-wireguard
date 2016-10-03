@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -20,6 +21,23 @@ const (
 	handshakeStateCreatedResponse
 	handshakeStateCreatedInitiation
 	handshakeStateConsumedResponse
+)
+
+const (
+	CounterBitsTotal     = 2048
+	BitsPerInt           = strconv.IntSize
+	CounterRedundantBits = BitsPerInt
+	CounterWindowSize    = CounterBitsTotal - BitsPerInt
+)
+
+const (
+	RekeyAfterMessages   = ^uint64(0) - 0xffff
+	RejectAfterMessages  = ^uint64(0) - CounterWindowSize - 1
+	RekeyTimeout         = time.Duration(5) * time.Second
+	RekeyAfterTime       = time.Duration(120) * time.Second
+	RejectAfterTime      = time.Duration(180) * time.Second
+	InitiationsPerSecond = time.Second / 50
+	MaxPeersPerDevice    = ^uint16(0)
 )
 
 func init() {
@@ -73,6 +91,90 @@ func (h *noiseHandshake) clear() {
 	h.state = handshakeStateZeroed
 }
 
+type noiseCounter struct {
+	counter uint64
+	// backtrack is only used for the replay detection bitmap algorithm,
+	// and is therefore only used by receiving keys. This happens to be wasteful
+	// for sending keys since there is no use for the backtrack array.
+	backtrack *[CounterBitsTotal / BitsPerInt]uint
+	sync.RWMutex
+}
+
+// Validate implements the replay detection bitmap algorithm in RFC6479.
+// The code below is a transcription from counter_validate in wireguard.
+func (n *noiseCounter) Validate(theirs uint64) bool {
+	if n.backtrack == nil {
+		return false
+	}
+
+	logCounterRedundantBits := uint(5)
+	if CounterRedundantBits == 64 {
+		logCounterRedundantBits = 6
+	}
+
+	n.Lock()
+	defer n.Unlock()
+
+	if n.counter >= RejectAfterMessages+1 || theirs >= RejectAfterMessages {
+		return false
+	}
+
+	theirs++
+
+	// message is too far in the past
+	if CounterWindowSize+theirs < n.counter {
+		return false
+	}
+
+	index := uint(theirs >> logCounterRedundantBits)
+
+	if theirs > n.counter {
+		indexCurrent := uint(n.counter >> logCounterRedundantBits)
+		top := index - indexCurrent
+		if top > CounterBitsTotal/BitsPerInt {
+			top = CounterBitsTotal / BitsPerInt
+		}
+		for i := uint(1); i <= top; i++ {
+			n.backtrack[(i+indexCurrent)&((CounterBitsTotal/BitsPerInt)-1)] = 0
+		}
+		n.counter = theirs
+	}
+
+	index &= CounterBitsTotal/BitsPerInt - 1
+
+	var mask uint = 1 << ((theirs & (CounterRedundantBits - 1)) - 1)
+	old := 0 == (n.backtrack[index] & mask)
+	n.backtrack[index] |= mask
+
+	return old
+}
+
+func (n *noiseCounter) nonce() uint64 {
+	return atomic.AddUint64(&n.counter, 1)
+}
+
+type noiseSymmetricKey struct {
+	counter   noiseCounter
+	birthdate time.Time
+	isValid   bool
+	noise.Cipher
+}
+
+func (k *noiseSymmetricKey) Nonce() (nonce uint64, ok bool) {
+	if !k.isValid || time.Now().After(k.birthdate.Add(RejectAfterTime)) {
+		k.isValid = false
+		return 0, false
+	}
+
+	nonce = k.counter.nonce() - 1
+	if nonce >= RejectAfterMessages {
+		k.isValid = false
+		return nonce, false
+	}
+
+	return nonce, true
+}
+
 type noiseKeypair struct {
 	initiator bool
 
@@ -80,8 +182,8 @@ type noiseKeypair struct {
 	senderIndex uint32
 	remoteIndex uint32
 
-	sending   noise.Cipher
-	receiving noise.Cipher
+	sending   noiseSymmetricKey
+	receiving noiseSymmetricKey
 
 	peer *peer
 }
@@ -278,14 +380,15 @@ func (f *Interface) handshakeConsumeResponse(data []byte) (*peer, error) {
 func (f *Interface) handshakeBeginSession(handshake *noiseHandshake, keypairs *noiseKeypairs, initiator bool) {
 	handshake.Lock()
 	defer handshake.Unlock()
+	birthdate := time.Now()
 	keypair := &noiseKeypair{
 		internalID:  atomic.AddUint64(&keypairCounter, 1),
 		remoteIndex: handshake.remoteIndex,
 		senderIndex: handshake.senderIndex,
 		peer:        handshake.peer,
 		initiator:   initiator,
-		receiving:   handshake.receivingCipher,
-		sending:     handshake.sendingCipher,
+		receiving:   noiseSymmetricKey{Cipher: handshake.receivingCipher, birthdate: birthdate, isValid: true, counter: noiseCounter{backtrack: new([CounterBitsTotal / BitsPerInt]uint)}},
+		sending:     noiseSymmetricKey{Cipher: handshake.sendingCipher, birthdate: birthdate, isValid: true},
 	}
 
 	f.handshakesMtx.Lock()
