@@ -1,8 +1,13 @@
 package wireguard
 
-import "log"
-import "net"
-import "runtime"
+import (
+	"errors"
+	"log"
+	"net"
+	"runtime"
+)
+
+var ErrHostUnreachable = errors.New("Host unreachable")
 
 // TODO: be smarter about this
 const mtu = 1500
@@ -68,10 +73,16 @@ func (f *Interface) receiveInsidePacket(buf []byte) error {
 
 	if peer == nil {
 		// we need to generate ICMP unreachable message
-		// but very tricky because we need to know our interface
-		// IP address, and the whole part of construcing the ICMP
-		// itself
+		// but a bit time consuming to implement at the moment.
+		return ErrHostUnreachable
 	}
 
-	return peer.send(buf)
+	// in the C implementation [device.c:xmit()] the queue is first
+	// trimmed and then the packet is enqueued (after being segmented
+	// using GSO); it is unclear (but probably unlikely) we need to
+	// do segmentation as the underlying TUN driver will do this for us;
+	// (and fairly easy to test).
+	peer.txQueue.BoundedAppend(buf, maxQueuePackets)
+
+	return peer.sendQueue()
 }
